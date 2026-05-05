@@ -43,6 +43,7 @@ jobs:
       - name: Send push embed
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          SUPATEWL_DISCORD_ENABLED: ${{ vars.SUPATEWL_DISCORD_ENABLED }}
           GITHUB_TOKEN: ${{ github.token }}
           WORKFLOW_INPUT_MODE: ${{ github.event.inputs.mode }}
           WORKFLOW_INPUT_HEADLINE: ${{ github.event.inputs.headline }}
@@ -59,6 +60,11 @@ jobs:
           from zoneinfo import ZoneInfo
 
           webhook = os.environ.get("DISCORD_WEBHOOK", "").strip()
+          workflow_enabled_raw = os.environ.get("SUPATEWL_DISCORD_ENABLED", "").strip().lower()
+          workflow_enabled = workflow_enabled_raw not in {"0", "false", "off", "no", "disabled"}
+          if not workflow_enabled:
+              print("SUPATEWL_DISCORD_ENABLED is off; skipping Discord notification.")
+              raise SystemExit(0)
           if not webhook:
               raise SystemExit("DISCORD_WEBHOOK is not set")
 
