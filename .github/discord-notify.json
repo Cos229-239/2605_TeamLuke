@@ -65,7 +65,7 @@
   "weekly_branches": {
     "main": false,
     "gh-pages": false,
-    "dev": true,
+    "dev": false,
     "PatrickPersonal": false
   },
   "version": 1
