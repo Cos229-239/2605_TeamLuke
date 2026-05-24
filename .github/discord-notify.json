@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "nightly_report_kickoff": false,
   "include": {
     "title_team": true,
@@ -19,54 +19,19 @@
     "repo": true,
     "push_size": true,
     "commit_author": true,
-    "footer_timestamp": true,
-    "p_title_team": true,
-    "p_title_action": true,
-    "p_hash1": true,
-    "p_sumrest": true,
-    "g_actor_k": true,
-    "g_actor_v": true,
-    "g_branch_k": true,
-    "g_branch_v": true,
-    "g_ts_k": true,
-    "g_ts_date_k": true,
-    "g_ts_time_k": true,
-    "g_ts_date": true,
-    "g_ts_time": true,
-    "g_status_k": true,
-    "g_status_v": true,
-    "g_ab_k": true,
-    "g_ab_v": true,
-    "g_repo_k": true,
-    "g_repo_v": true,
-    "b_ps_k": true,
-    "b_ps_v": true,
-    "b_cm_k": true,
-    "p_hash2": true,
-    "b_cm_rest": true,
-    "b_ca_k": true,
-    "b_ca_v": true,
-    "b_fc_k": true,
-    "b_fc_v": true,
-    "p_footer": true
+    "footer_timestamp": true
   },
   "branches": {
     "main": false,
-    "gh-pages": false,
-    "dev": true,
-    "PatrickPersonal": false
+    "gh-pages": false
   },
   "nightly_branches": {
     "main": false,
-    "gh-pages": false,
-    "dev": false,
-    "PatrickPersonal": false
+    "gh-pages": false
   },
   "weekly_branches": {
     "main": false,
-    "gh-pages": false,
-    "dev": false,
-    "PatrickPersonal": false
+    "gh-pages": false
   },
   "version": 1
 }
