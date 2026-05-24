@@ -267,8 +267,12 @@ jobs:
 
           def infer_cycle_label(repo_name: str) -> str:
               text = str(repo_name or "").strip()
+              import re
+              match = re.search(r"(?<!\d)(\d{4})_team\d+", text, re.IGNORECASE)
+              if match:
+                  return match.group(1)
               if "_" in text:
-                  prefix = text.split("_", 1)[0].strip()
+                  prefix = text.split("_", 1)[0].strip().split("/")[-1]
                   if len(prefix) == 4 and prefix.isdigit():
                       return prefix
               return ""
@@ -313,13 +317,13 @@ jobs:
 
           def build_branch_status_embed(repo_label: str, cycle_label: str, summary_text: str, rows: list[str], headline: str = "") -> dict:
               repo_text = str(repo_label or "repo").strip() or "repo"
-              cycle_text = str(cycle_label or "cycle").strip() or "cycle"
+              cycle_text = str(cycle_label or "").strip()
               since_text = str(headline or "").strip()
               display_rows = [str(row or "").rstrip() for row in list(rows or []) if str(row or "").strip()]
-              description_lines = [
-                  f"**Cycle:** `{cycle_text}`",
-                  f"**Repo:** `{repo_text}`",
-              ]
+              description_lines = []
+              if len(cycle_text) == 4 and cycle_text.isdigit():
+                  description_lines.append(f"**Cycle:** `{cycle_text}`")
+              description_lines.append(f"**Repo:** `{repo_text}`")
               if since_text:
                   description_lines.extend([
                       f"**Since last check:** {since_text}",
@@ -409,13 +413,13 @@ jobs:
               payload = {
                   "embeds": [
                       {
-                          "title": f"{test_repo} notifications are live",
-                          "description": "This is a setup test post from SupaTewl.",
+                          "title": "Test post",
+                          "description": f"This is a test for {test_repo}.",
                           "color": 5814783,
                           "fields": [
                               {"name": "Repo", "value": test_repo, "inline": True},
                               {"name": "Cycle", "value": test_cycle, "inline": True},
-                              {"name": "Status", "value": "Webhook saved and ready for push notifications.", "inline": False},
+                              {"name": "Status", "value": "If you can see this, future automated messages can post here.", "inline": False},
                           ],
                       }
                   ]
@@ -436,11 +440,12 @@ jobs:
               if not notify_enabled:
                   raise SystemExit(0)
               status_repo = input_repo_label or repo or "repo"
-              status_cycle = input_cycle or infer_cycle_label(status_repo) or "cycle"
+              status_cycle = input_cycle or infer_cycle_label(status_repo)
               tracked = scheduled_status_branches()
               if not tracked:
                   raise SystemExit(0)
               rows = []
+              diverged_embeds = []
               counts = {"Diverged": 0, "Behind": 0, "Ahead": 0, "In Sync": 0, "Unknown": 0}
               for branch_name in tracked:
                   compare = fetch_branch_compare(repo, "dev", branch_name)
@@ -448,6 +453,8 @@ jobs:
                   counts[state_name] = counts.get(state_name, 0) + 1
                   ahead_behind = str(compare.get("ahead_behind") or "—").strip() or "—"
                   rows.append(f"{state_icon(state_name)} **{branch_name}** — {state_name} ({ahead_behind})")
+                  if state_name == "Diverged":
+                      diverged_embeds.append(build_branch_fix_help_embed(repo, branch_name, compare))
               summary_text = (
                   f"{counts.get('Diverged', 0)} diverged · "
                   f"{counts.get('Behind', 0)} behind · "
@@ -456,8 +463,9 @@ jobs:
               )
               payload = {
                   "embeds": [
-                      build_branch_status_embed(status_repo, status_cycle, summary_text, rows[:20], "Branch VS Dev Update")
-                  ]
+                      build_branch_status_embed(status_repo, status_cycle, summary_text, rows[:20], "Branch VS Dev Update"),
+                      *diverged_embeds,
+                  ][:10]
               }
           else:
               if not notify_enabled:
