@@ -277,22 +277,83 @@ jobs:
                       return prefix
               return ""
 
+          def branch_policy_entry(branch_name: str) -> dict:
+              name = str(branch_name or "").strip()
+              if not name:
+                  return {}
+              raw = branch_policy.get(name)
+              if isinstance(raw, dict):
+                  return dict(raw)
+              if isinstance(raw, bool):
+                  return {"push": bool(raw)}
+              return {}
+
           def branch_notifications_enabled(branch_name: str) -> bool:
               name = str(branch_name or "").strip()
               if not name:
                   return True
               if name in branch_policy:
+                  entry = branch_policy_entry(name)
+                  if entry:
+                      return bool(entry.get("push", False))
                   return bool(branch_policy.get(name))
               if name in ("main", "gh-pages"):
                   return False
               return True
+
+          def branch_diverged_notice_enabled(branch_name: str) -> bool:
+              entry = branch_policy_entry(branch_name)
+              if entry:
+                  return bool(entry.get("diverged", False))
+              return False
+
+          def branch_mentions_enabled(branch_name: str) -> bool:
+              entry = branch_policy_entry(branch_name)
+              if entry:
+                  return bool(entry.get("mention", False))
+              return False
+
+          def branch_owner_discord_user_id(branch_name: str) -> str:
+              entry = branch_policy_entry(branch_name)
+              return str(entry.get("owner_discord_user_id", "")).strip() if entry else ""
+
+          def branch_mention_text(branch_name: str) -> str:
+              name = str(branch_name or "").strip()
+              if not name or not branch_mentions_enabled(name):
+                  return ""
+              lowered = name.lower()
+              mention_ids: list[str] = []
+              if lowered in {"dev", "main", "gh-pages"}:
+                  for other_name, raw in list(branch_policy.items()):
+                      other = str(other_name or "").strip()
+                      if not other or other.lower() in {"dev", "main", "gh-pages"}:
+                          continue
+                      entry = branch_policy_entry(other)
+                      if not entry:
+                          continue
+                      if not bool(entry.get("push", False)):
+                          continue
+                      if not bool(entry.get("mention", False)):
+                          continue
+                      uid = str(entry.get("owner_discord_user_id", "")).strip()
+                      if uid and uid not in mention_ids:
+                          mention_ids.append(uid)
+              else:
+                  uid = branch_owner_discord_user_id(name)
+                  if uid:
+                      mention_ids.append(uid)
+              return " ".join(f"<@{uid}>" for uid in mention_ids if uid)
 
           def scheduled_status_branches() -> list[str]:
               rows = []
               seen = set()
               for name, enabled in list(branch_policy.items()):
                   branch_name = str(name or "").strip()
-                  if not branch_name or not enabled:
+                  if not branch_name:
+                      continue
+                  entry = branch_policy_entry(branch_name)
+                  nightly_on = bool(entry.get("nightly", False)) if entry else bool(enabled)
+                  if not nightly_on:
                       continue
                   if branch_name in ("main", "gh-pages", "dev"):
                       continue
@@ -362,10 +423,11 @@ jobs:
                   lines.extend([f"- `{item}`" for item in preview_files])
               else:
                   lines.append("- No file list available.")
+              state_name = str(branch_compare.get("state") or "Unknown").strip().lower()
               return {
                   "title": f"Branch Push Alert · {branch_name}",
                   "description": "\n".join(lines),
-                  "color": 0x5865F2,
+                  "color": 0xC0392B if state_name == "diverged" else 0x5865F2,
               }
 
           def build_branch_fix_help_embed(repo_name: str, branch_name: str, branch_compare: dict) -> dict:
@@ -453,8 +515,9 @@ jobs:
                   counts[state_name] = counts.get(state_name, 0) + 1
                   ahead_behind = str(compare.get("ahead_behind") or "—").strip() or "—"
                   rows.append(f"{state_icon(state_name)} **{branch_name}** — {state_name} ({ahead_behind})")
-                  if state_name == "Diverged":
+                  if state_name == "Diverged" and branch_diverged_notice_enabled(branch_name):
                       diverged_embeds.append(build_branch_fix_help_embed(repo, branch_name, compare))
+              mention_text = " ".join(filter(None, [branch_mention_text(name) for name in tracked if str(fetch_branch_compare(repo, 'dev', name).get('state') or '').strip() == 'Diverged' and branch_diverged_notice_enabled(name)]))
               summary_text = (
                   f"{counts.get('Diverged', 0)} diverged · "
                   f"{counts.get('Behind', 0)} behind · "
@@ -462,6 +525,8 @@ jobs:
                   f"{counts.get('In Sync', 0)} in sync"
               )
               payload = {
+                  "content": mention_text,
+                  "allowed_mentions": {"parse": ["users"]} if mention_text else {"parse": []},
                   "embeds": [
                       build_branch_status_embed(status_repo, status_cycle, summary_text, rows[:20], "Branch VS Dev Update"),
                       *diverged_embeds,
@@ -492,9 +557,14 @@ jobs:
                   files_changed = fetch_commit_files(repo, head_sha_full)
               push_embed = build_branch_push_embed(repo, branch, branch_compare, files_changed)
               embeds = [push_embed]
-              if str(branch_compare.get("state") or "").strip() == "Diverged":
+              if str(branch_compare.get("state") or "").strip() == "Diverged" and branch_diverged_notice_enabled(branch):
                   embeds.append(build_branch_fix_help_embed(repo, branch, branch_compare))
-              payload = {"embeds": embeds[:10]}
+              mention_text = branch_mention_text(branch)
+              payload = {
+                  "content": mention_text,
+                  "allowed_mentions": {"parse": ["users"]} if mention_text else {"parse": []},
+                  "embeds": embeds[:10],
+              }
 
           req = urllib.request.Request(
               webhook,
