@@ -1,0 +1,24 @@
+{
+  "name": "parentvault",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Secure co-parenting vault and schedule assistant for Android and iOS.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile": "npm --workspace apps/mobile run start",
+    "api": "npm --workspace apps/api run dev",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "pptxgenjs": "^4.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
